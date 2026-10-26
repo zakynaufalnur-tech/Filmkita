@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FilmKita - Tontonan Film</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        :root { --merah: #e50914; --gelap: #141414; --abu: #2d2d2d; --teks: #e5e5e5; }
+        body { background: var(--gelap); color: var(--teks); min-height: 100vh; }
+        header { background: linear-gradient(#000, transparent); padding: 1.5rem 3rem; position: fixed; width: 100%; top: 0; z-index: 100; }
+        .logo { font-size: 1.8rem; font-weight: bold; color: var(--merah); text-decoration: none; }
+        .pencarian { margin-top: 0.5rem; display: flex; gap: 0.5rem; max-width: 500px; }
+        input { flex: 1; padding: 0.75rem 1rem; border: none; border-radius: 4px; background: rgba(255,255,255,0.2); color: white; font-size: 1rem; }
+        button { padding: 0.75rem 1.5rem; background: var(--merah); border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #b20710; }
+        main { padding: 7rem 3rem 3rem; }
+        h2 { margin: 2rem 0 1rem; font-size: 1.4rem; }
+        .kisi-film { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; }
+        .kartu-film { cursor: pointer; transition: transform 0.3s; }
+        .kartu-film:hover { transform: scale(1.05); }
+        .kartu-film img { width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); background: var(--abu); min-height: 270px; object-fit: cover; }
+        .kartu-film h3 { margin-top: 0.5rem; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kartu-film p { font-size: 0.8rem; color: #999; margin-top: 0.25rem; }
+        .pemutar { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 200; display: none; align-items: center; justify-content: center; padding: 2rem; }
+        .wadah-pemutar { width: 100%; max-width: 900px; }
+        .tutup { position: absolute; top: 1.5rem; right: 2rem; font-size: 2rem; color: white; cursor: pointer; }
+        .bingkai-video { width: 100%; height: 450px; background: var(--abu); border-radius: 8px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+        .info-film { margin-top: 1rem; }
+        .memuat { text-align: center; padding: 3rem; color: #999; }
+        .pesan-kosong { text-align: center; padding: 3rem; color: #999; grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="#" class="logo">🎬 FilmKita</a>
+    <div class="pencarian">
+        <input type="text" id="kataKunci" placeholder="Cari judul film...">
+        <button onclick="cariFilm()">Cari</button>
+    </div>
+</header>
+
+<main>
+    <h2 id="judul-bagian">🔥 Sedang Populer</h2>
+    <div id="daftar-film" class="kisi-film">
+        <div class="memuat">Memuat daftar film...</div>
+    </div>
+</main>
+
+<!-- Pemutar / Detail Film -->
+<div id="pemutar" class="pemutar">
+    <span class="tutup" onclick="tutupPemutar()">&times;</span>
+    <div class="wadah-pemutar">
+        <div id="bingkai-video" class="bingkai-video"></div>
+        <div class="info-film">
+            <h2 id="nama-film"></h2>
+            <p id="tanggal-rilis"></p>
+            <p id="ringkasan" style="margin-top: 1rem; line-height: 1.6;"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========= KONFIGURASI API =========
+const API_KEY = 'a312efa1479a20df3a84defe500a3e19'; // Kunci kamu
+const URL_DASAR = 'https://api.themoviedb.org/3';
+const URL_GAMBAR = 'https://image.tmdb.org/t/p/w500';
+
+// Muat film populer saat halaman dibuka
+document.addEventListener('DOMContentLoaded', () => {
+    ambilFilmPopuler();
+});
+
+// Ambil daftar film populer
+async function ambilFilmPopuler() {
+    try {
+        const res = await fetch(`${URL_DASAR}/movie/popular?api_key=${API_KEY}&language=id-ID`);
+        const data = await res.json();
+        
+        if (data.results) {
+            tampilkanFilm(data.results);
+        } else {
+            tampilkanKesalahan();
+        }
+    } catch (err) {
+        console.error('Kesalahan ambil data:', err);
+        tampilkanKesalahan();
+    }
+}
+
+// Cari film berdasarkan kata kunci
+async function cariFilm() {
+    const kata = document.getElementById('kataKunci').value.trim();
+    if (!kata) return ambilFilmPopuler();
+
+    document.getElementById('judul-bagian').textContent = `Hasil: "${kata}"`;
+    
+    try {
+        const res = await fetch(`${URL_DASAR}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(kata)}&language=id-ID`);
+        const data = await res.json();
+        tampilkanFilm(data.results || []);
+    } catch (err) {
+        console.error('Kesalahan pencarian:', err);
+        tampilkanKesalahan();
+    }
+}
+
+// Tampilkan daftar film
+function tampilkanFilm(daftar) {
+    const wadah = document.getElementById('daftar-film');
+    
+    if (daftar.length === 0) {
+        wadah.innerHTML = '<p class="pesan-kosong">Film tidak ditemukan.</p>';
+        return;
+    }
+
+    wadah.innerHTML = daftar.map(film => `
+        <div class="kartu-film" onclick="bukaDetail(${film.id}, '${film.title.replace(/'/g, "\\'")}', '${film.release_date || '-'}', '${(film.overview || '').replace(/'/g, "\\'")}', '${film.poster_path || ''}')">
+            <img src="${film.poster_path ? URL_GAMBAR + film.poster_path : 'https://via.placeholder.com/300x450?text=Tanpa+Gambar'}" alt="${film.title}">
+            <h3>${film.title}</h3>
+            <p>⭐ ${film.vote_average || 'N/A'}</p>
+        </div>
+    `).join('');
+}
+
+// Buka detail film
+function bukaDetail(id, judul, rilis, ringkasan, poster) {
+    document.getElementById('nama-film').textContent = judul;
+    document.getElementById('tanggal-rilis').textContent = `Tayang: ${rilis}`;
+    document.getElementById('ringkasan').textContent = ringkasan || 'Deskripsi tidak tersedia.';
+    
+    // Catatan: TMDB TIDAK menyediakan tautan video langsung
+    const bingkai = document.getElementById('bingkai-video');
+    bingkai.innerHTML = `
+        <div>
+            <h3>🎬 ${judul}</h3>
+            <p style="margin-top: 1rem;">Untuk memutar video, gunakan layanan penyedia tontonan resmi.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #aaa;">ID Film: ${id}</p>
+            <p style="margin-top: 1rem; font-size: 0.8rem; color: #888;">
+                💡 Kunci API kamu: ${API_KEY}<br>
+                Ganti dengan kunci TMDB asli dari akun kamu untuk akses penuh
+            </p>
+        </div>
+    `;
+    
+    document.getElementById('pemutar').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function tutupPemutar() {
+    document.getElementById('pemutar').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function tampilkanKesalahan() {
+    document.getElementById('daftar-film').innerHTML = `
+        <p class="pesan-kosong">
+            ❌ Gagal terhubung ke API.<br>
+            Kemungkinan kunci <code>${API_KEY}</code> belum terdaftar.<br>
+            Daftar di <strong>themoviedb.org</strong> untuk dapatkan kunci asli.
+        </p>
+    `;
+}
+
+// Izinkan cari dengan tekan Enter
+document.getElementById('kataKunci').addEventListener('keypress', e => {
+    if (e.key === 'Enter') cariFilm();
+});
+</script>
+
+</body>
+</html>
